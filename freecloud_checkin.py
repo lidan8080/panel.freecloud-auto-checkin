@@ -1,12 +1,15 @@
 import os, time, requests
+from datetime import datetime
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from datetime import datetime
+from selenium.webdriver.chrome.service import Service
+from webdriver_manager.chrome import ChromeDriverManager
 
-FC_URL = "https://panel.freecloud.ltd/clientarea.php"
+LOGIN_URL = "https://panel.freecloud.ltd/clientarea.php"
+CHECKIN_URL = "https://panel.freecloud.ltd/clientarea.php?action=checkin"
 
 def send_telegram(msg):
     token = os.getenv("TELEGRAM_BOT_TOKEN")
@@ -15,54 +18,65 @@ def send_telegram(msg):
         return
     requests.post(
         f"https://api.telegram.org/bot{token}/sendMessage",
-        data={"chat_id": chat_id, "text": msg}
+        data={"chat_id": chat_id, "text": msg},
+        timeout=10
     )
 
 def run_account(email, password):
-    opts = Options()
-    opts.add_argument("--headless")
-    opts.add_argument("--no-sandbox")
-    opts.add_argument("--disable-dev-shm-usage")
+    options = Options()
+    options.add_argument("--headless=new")
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
+    options.add_argument("--window-size=1920,1080")
 
-    driver = webdriver.Chrome(options=opts)
+    service = Service(ChromeDriverManager().install())
+    driver = webdriver.Chrome(service=service, options=options)
     wait = WebDriverWait(driver, 30)
 
     try:
-        driver.get(FC_URL)
+        driver.get(LOGIN_URL)
 
-        # 登录
-        wait.until(EC.presence_of_element_located((By.NAME, "username"))).send_keys(email)
+        # WHMCS 登录
+        wait.until(EC.presence_of_element_located((By.NAME, "email"))).send_keys(email)
         driver.find_element(By.NAME, "password").send_keys(password)
-        driver.find_element(By.CSS_SELECTOR, "button[type=submit]").click()
+        driver.find_element(By.CSS_SELECTOR, "button[type='submit']").click()
 
-        # 等 dashboard
-        wait.until(lambda d: "clientarea.php" in d.current_url)
-
-        # 签到按钮（FreeCloud 实际就是一个按钮）
+        # 登录成功判断
+        wait.until(EC.presence_of_element_located((By.TAG_NAME, "body")))
         time.sleep(3)
-        buttons = driver.find_elements(By.XPATH, "//button")
-        for b in buttons:
-            if "签到" in b.text:
-                b.click()
-                break
 
+        if "login" in driver.current_url.lower():
+            return "❌ 登录失败"
+
+        # 直接访问签到页（最稳）
+        driver.get(CHECKIN_URL)
         time.sleep(5)
-        return "✅ 签到完成 / 已签到"
+
+        page_text = driver.page_source
+        if "已签到" in page_text or "签到成功" in page_text:
+            return "✅ 今日已签到"
+        if "签到" in page_text:
+            return "✅ 签到完成"
+
+        return "⚠️ 未识别签到结果"
 
     except Exception as e:
-        return f"❌ 失败：{str(e)[:120]}"
+        return f"❌ 异常：{str(e)[:120]}"
     finally:
         driver.quit()
 
 def main():
     accounts = os.getenv("FC_ACCOUNTS", "")
     results = []
+
     for pair in accounts.split(","):
         email, pwd = pair.split(":", 1)
-        res = run_account(email.strip(), pwd.strip())
-        results.append(f"{email[:3]}***: {res}")
+        result = run_account(email.strip(), pwd.strip())
+        results.append(f"{email[:3]}***: {result}")
+        time.sleep(3)
 
-    msg = "🚀【FreeCloud 自动签到】\n" + datetime.now().strftime("%Y-%m-%d") + "\n\n"
+    msg = "🚀【FreeCloud 自动签到】\n"
+    msg += datetime.now().strftime("%Y-%m-%d") + "\n\n"
     msg += "\n".join(results)
     send_telegram(msg)
 

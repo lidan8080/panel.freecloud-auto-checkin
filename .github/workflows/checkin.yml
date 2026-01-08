@@ -2,7 +2,8 @@ name: FreeCloud Auto Checkin
 
 on:
   schedule:
-    - cron: '30 17 * * *'   # UTC 17:30 = 北京时间 01:30
+    # UTC 17:30 = 北京时间 01:30
+    - cron: '30 17 * * *'
   workflow_dispatch:
 
 jobs:
@@ -10,22 +11,25 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v4
+      - name: Set up Python
+        uses: actions/setup-python@v4
         with:
           python-version: '3.11'
 
-      - name: Install dependencies
+      - name: Install Python dependencies
         run: |
-          pip install selenium requests
+          python -m pip install --upgrade pip
+          pip install selenium requests webdriver-manager
 
-      - name: Install Chrome
+      - name: Install Google Chrome
         run: |
-          sudo apt update
-          sudo apt install -y google-chrome-stable
+          sudo apt-get update
+          sudo apt-get install -y google-chrome-stable
 
-      - name: Run checkin
+      - name: Run FreeCloud checkin
         env:
           FC_ACCOUNTS: ${{ secrets.FC_ACCOUNTS }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}

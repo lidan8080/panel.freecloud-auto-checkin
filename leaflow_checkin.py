@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """
-FreeCloud 自动签到（requests 稳定版）
+FreeCloud 自动签到（WHMCS · requests 终局稳定版）
 """
 
 import os
+import re
 import requests
 import logging
 from datetime import datetime
@@ -14,8 +15,10 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-LOGIN_URL = "https://panel.freecloud.ltd/dologin.php"
-CHECKIN_URL = "https://panel.freecloud.ltd/clientarea.php?action=checkin"
+BASE = "https://panel.freecloud.ltd"
+LOGIN_PAGE = f"{BASE}/clientarea.php"
+LOGIN_POST = f"{BASE}/dologin.php"
+CHECKIN_URL = f"{BASE}/clientarea.php?action=checkin"
 
 def send_telegram(msg):
     token = os.getenv("TELEGRAM_BOT_TOKEN")
@@ -28,32 +31,47 @@ def send_telegram(msg):
         timeout=10
     )
 
+def extract_token(html: str):
+    """
+    WHMCS 登录页里有：
+    <input type="hidden" name="token" value="xxxx">
+    """
+    m = re.search(r'name="token"\s+value="([^"]+)"', html)
+    return m.group(1) if m else None
+
 def login_and_checkin(email, password):
-    session = requests.Session()
-    session.headers.update({
+    s = requests.Session()
+    s.headers.update({
         "User-Agent": "Mozilla/5.0",
-        "Referer": "https://panel.freecloud.ltd/clientarea.php"
+        "Referer": LOGIN_PAGE,
     })
 
-    # 登录
-    resp = session.post(LOGIN_URL, data={
+    # 1️⃣ 访问登录页，拿 token
+    r = s.get(LOGIN_PAGE, timeout=15)
+    token = extract_token(r.text)
+    if not token:
+        return False, "未获取到登录 token"
+
+    # 2️⃣ 正确登录（WHMCS）
+    resp = s.post(LOGIN_POST, data={
         "username": email,
-        "password": password
+        "password": password,
+        "token": token
     }, timeout=15)
 
     if "logout" not in resp.text.lower():
         return False, "登录失败"
 
-    # 签到
-    r = session.get(CHECKIN_URL, timeout=15)
-    text = r.text
+    # 3️⃣ 签到
+    c = s.get(CHECKIN_URL, timeout=15)
+    t = c.text
 
-    if "签到成功" in text:
+    if "签到成功" in t:
         return True, "签到成功"
-    if "已经签到" in text:
+    if "已经签到" in t:
         return True, "今日已签到"
 
-    return False, "签到状态未知"
+    return True, "已登录，但签到状态未知"
 
 def main():
     raw = os.getenv("FC_ACCOUNTS", "")

@@ -9,31 +9,35 @@ on:
 jobs:
   checkin:
     runs-on: ubuntu-latest
-    timeout-minutes: 15  # 新增：设置超时时间，避免卡死
+    timeout-minutes: 15  # 设置超时时间，避免卡死
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v5  # 升级到v5版本，更稳定
+        uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-          cache: 'pip'  # 新增：缓存pip依赖，加速运行
+          cache: 'pip'  # 缓存pip依赖，加速运行
 
       - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
           pip install selenium requests webdriver-manager
 
-      - name: Install fixed version Chrome  # 核心修改：安装固定版本Chrome，避免兼容问题
+      - name: Install Google Chrome (官方源方式)  # 核心修改：改用官方源安装
         run: |
           sudo apt-get update
-          # 下载120.0.6099.109版本Chrome（与Driver版本匹配）
-          wget https://dl.google.com/linux/chrome/deb/pool/main/g/google-chrome-stable/google-chrome-stable_120.0.6099.109-1_amd64.deb -O chrome.deb
-          sudo dpkg -i chrome.deb
-          # 自动修复依赖问题
-          sudo apt-get install -f -y
+          # 安装依赖
+          sudo apt-get install -y wget gnupg2 apt-transport-https ca-certificates
+          # 添加谷歌官方GPG密钥
+          wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
+          # 添加谷歌Chrome源
+          echo "deb [arch=amd64] https://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google-chrome.list
+          # 更新源并安装最新稳定版Chrome
+          sudo apt-get update
+          sudo apt-get install -y google-chrome-stable
           # 验证Chrome版本
           google-chrome --version
 

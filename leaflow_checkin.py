@@ -11,6 +11,7 @@ import logging
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.chrome.service import Service
 
 # ================= 日志配置 =================
 logging.basicConfig(
@@ -18,6 +19,10 @@ logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
+
+CHROME_BINARY = "/usr/bin/chromium-browser"
+CHROMEDRIVER_PATH = "/usr/bin/chromedriver"
+
 
 class FreeCloudAutoCheckin:
     def __init__(self, username, password):
@@ -27,23 +32,19 @@ class FreeCloudAutoCheckin:
         self.setup_driver()
 
     def setup_driver(self):
-        chrome_options = Options()
+        options = Options()
 
-        if os.getenv("GITHUB_ACTIONS"):
-            chrome_options.add_argument("--headless")
-            chrome_options.add_argument("--no-sandbox")
-            chrome_options.add_argument("--disable-dev-shm-usage")
-            chrome_options.add_argument("--disable-gpu")
-            chrome_options.add_argument("--window-size=1920,1080")
+        # ✅ GitHub Actions 必备参数
+        options.binary_location = CHROME_BINARY
+        options.add_argument("--headless=new")
+        options.add_argument("--no-sandbox")
+        options.add_argument("--disable-dev-shm-usage")
+        options.add_argument("--disable-gpu")
+        options.add_argument("--window-size=1920,1080")
 
-        chrome_options.add_argument("--disable-blink-features=AutomationControlled")
-        chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
-        chrome_options.add_experimental_option("useAutomationExtension", False)
+        service = Service(CHROMEDRIVER_PATH)
 
-        self.driver = webdriver.Chrome(options=chrome_options)
-        self.driver.execute_script(
-            "Object.defineProperty(navigator, 'webdriver', {get: () => undefined})"
-        )
+        self.driver = webdriver.Chrome(service=service, options=options)
 
     def login(self):
         logger.info("登录 FreeCloud")
@@ -91,6 +92,7 @@ class FreeCloudAutoCheckin:
             if self.driver:
                 self.driver.quit()
 
+
 class MultiAccountManager:
     def __init__(self):
         self.accounts = self.load_accounts()
@@ -121,6 +123,7 @@ class MultiAccountManager:
             time.sleep(5)
         return results
 
+
 def main():
     logger.info("开始 FreeCloud 多账号签到")
     manager = MultiAccountManager()
@@ -136,6 +139,7 @@ def main():
         logger.info(f"{status} {masked} - {msg}")
 
     exit(0)
+
 
 if __name__ == "__main__":
     main()

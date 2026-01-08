@@ -7,7 +7,6 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
-from webdriver_manager.core.version import Version  # 新增：用于指定Driver版本
 
 LOGIN_URL = "https://panel.freecloud.ltd/clientarea.php"
 CHECKIN_URL = "https://panel.freecloud.ltd/clientarea.php?action=checkin"
@@ -28,18 +27,18 @@ def send_telegram(msg):
 
 def run_account(email, password):
     options = Options()
-    # 核心修改：补充更多适配无界面环境的参数
+    # 适配无界面环境的核心参数
     options.add_argument("--headless=new")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--window-size=1920,1080")
-    options.add_argument("--disable-gpu")  # 新增：禁用GPU加速（无界面环境必加）
-    options.add_argument("--disable-extensions")  # 新增：禁用扩展，减少冲突
-    options.add_argument("--disable-software-rasterizer")  # 新增：解决渲染问题
-    options.add_experimental_option("excludeSwitches", ["enable-logging"])  # 新增：屏蔽无关日志
+    options.add_argument("--disable-gpu")
+    options.add_argument("--disable-extensions")
+    options.add_argument("--disable-software-rasterizer")
+    options.add_experimental_option("excludeSwitches", ["enable-logging"])  # 屏蔽无关日志
 
-    # 核心修改：强制指定ChromeDriver版本，与固定的Chrome版本匹配
-    service = Service(ChromeDriverManager(version=Version("120.0.6099.109")).install())
+    # 核心修改：移除固定版本，让webdriver-manager自动匹配当前Chrome版本
+    service = Service(ChromeDriverManager().install())
     driver = webdriver.Chrome(service=service, options=options)
     wait = WebDriverWait(driver, 30)
 

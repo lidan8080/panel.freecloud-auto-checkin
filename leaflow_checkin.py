@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-FreeCloud 自动签到（WHMCS · requests 终局稳定版）
+FreeCloud 自动签到（WHMCS · CSRF 终局兼容版）
 """
 
 import os
@@ -20,6 +20,8 @@ LOGIN_PAGE = f"{BASE}/clientarea.php"
 LOGIN_POST = f"{BASE}/dologin.php"
 CHECKIN_URL = f"{BASE}/clientarea.php?action=checkin"
 
+
+# ================= Telegram =================
 def send_telegram(msg):
     token = os.getenv("TELEGRAM_BOT_TOKEN")
     chat_id = os.getenv("TELEGRAM_CHAT_ID")
@@ -31,14 +33,29 @@ def send_telegram(msg):
         timeout=10
     )
 
+
+# ================= Token 提取 =================
 def extract_token(html: str):
     """
-    WHMCS 登录页里有：
-    <input type="hidden" name="token" value="xxxx">
+    兼容 WHMCS 两种 token 方式：
+    1. <input name="token" value="xxx">
+    2. var csrfToken = "xxx"; / window.csrfToken = "xxx"
     """
-    m = re.search(r'name="token"\s+value="([^"]+)"', html)
-    return m.group(1) if m else None
 
+    # 方式 1：hidden input
+    m = re.search(r'name="token"\s+value="([^"]+)"', html)
+    if m:
+        return m.group(1)
+
+    # 方式 2：JS csrfToken
+    m = re.search(r'csrfToken\s*=\s*[\'"]([^\'"]+)[\'"]', html)
+    if m:
+        return m.group(1)
+
+    return None
+
+
+# ================= 核心流程 =================
 def login_and_checkin(email, password):
     s = requests.Session()
     s.headers.update({
@@ -46,13 +63,14 @@ def login_and_checkin(email, password):
         "Referer": LOGIN_PAGE,
     })
 
-    # 1️⃣ 访问登录页，拿 token
+    # 1️⃣ 访问登录页
     r = s.get(LOGIN_PAGE, timeout=15)
     token = extract_token(r.text)
+
     if not token:
         return False, "未获取到登录 token"
 
-    # 2️⃣ 正确登录（WHMCS）
+    # 2️⃣ 登录（WHMCS 标准）
     resp = s.post(LOGIN_POST, data={
         "username": email,
         "password": password,
@@ -71,8 +89,10 @@ def login_and_checkin(email, password):
     if "已经签到" in t:
         return True, "今日已签到"
 
-    return True, "已登录，但签到状态未知"
+    return True, "已登录，签到状态未知"
 
+
+# ================= 主入口 =================
 def main():
     raw = os.getenv("FC_ACCOUNTS", "")
     if not raw:
@@ -96,6 +116,7 @@ def main():
         message += ("✅" if ok else "❌") + f" {email[:3]}***：{msg}\n"
 
     send_telegram(message)
+
 
 if __name__ == "__main__":
     main()

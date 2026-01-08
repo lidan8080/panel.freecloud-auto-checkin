@@ -2,13 +2,14 @@ name: FreeCloud Auto Checkin
 
 on:
   schedule:
-    - cron: '30 17 * * *'  # UTC 17:30 = 北京时间 01:30
-  workflow_dispatch:
+    # UTC 17:30 = 北京时间 01:30
+    - cron: '30 17 * * *'
+  workflow_dispatch:  # 手动触发开关
 
 jobs:
   checkin:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15  # 设置超时时间，避免任务卡死
 
     steps:
       - name: Checkout code
@@ -18,12 +19,15 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-          cache: 'pip'
+          cache: 'pip'  # 缓存pip依赖，加速后续运行
 
-      - name: Install dependencies
+      - name: Install Python dependencies (含requests-html)
         run: |
           python -m pip install --upgrade pip
-          pip install requests beautifulsoup4  # 仅需这两个依赖，无需Selenium
+          # 安装核心依赖：requests + requests-html（支持JS渲染）
+          pip install requests requests-html
+          # 可选：安装依赖时忽略缓存，确保最新版本
+          pip install --no-cache-dir requests requests-html
 
       - name: Run FreeCloud checkin
         env:

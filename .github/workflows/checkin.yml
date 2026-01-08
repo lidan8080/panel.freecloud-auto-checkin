@@ -1,10 +1,8 @@
-name: Leaflow Auto Checkin
+name: FreeCloud Auto Checkin
 
 on:
   schedule:
-    # 北京时间 每天 01:30
-    # UTC = 前一天 17:30
-    - cron: '30 17 * * *'
+    - cron: '30 17 * * *'   # UTC 17:30 = 北京时间 01:30
   workflow_dispatch:
 
 jobs:
@@ -12,29 +10,26 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
+      - uses: actions/setup-python@v4
         with:
           python-version: '3.11'
 
-      - name: Install Python dependencies
+      - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
           pip install selenium requests
 
-      - name: Install Chromium
+      - name: Install Chrome
         run: |
-          sudo apt-get update
-          sudo apt-get install -y chromium-browser chromium-chromedriver
+          sudo apt update
+          sudo apt install -y google-chrome-stable
 
-      - name: Run FreeCloud auto checkin
+      - name: Run checkin
         env:
           FC_ACCOUNTS: ${{ secrets.FC_ACCOUNTS }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           GITHUB_ACTIONS: true
         run: |
-          python leaflow_checkin.py
+          python freecloud_checkin.py
